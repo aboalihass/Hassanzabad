@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestion Transport v4 — Tout éditable (offline)</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --ink:#111; --muted:#666; --accent:#111; --danger:#bf1b1b; --line:#ececec; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--accent);color:#fff;padding:14px 16px}
+  header h1{margin:0;font-size:18px}
+  nav{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;background:#eef0f4;position:sticky;top:0;z-index:10}
+  nav button{padding:8px 10px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer}
+  nav button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  main{padding:12px} section{display:none} section.active{display:block}
+  h2{margin:8px 0 12px}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  input,select,textarea{width:100%;padding:9px 10px;border:1px solid #d9d9e0;border-radius:8px;background:#fff}
+  label{font-size:12px;color:#444}
+  .card{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;font-size:14px;vertical-align:top}
+  th{background:#fafafd;position:sticky;top:0}
+  .btn{padding:9px 12px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer}
+  .btn.secondary{background:#6b7280}
+  .btn.danger{background:var(--danger)}
+  .pill{font-size:12px;padding:2px 8px;border-radius:999px;background:#eee;display:inline-block}
+  .muted{color:var(--muted);font-size:12px}
+  .nowrap{white-space:nowrap}
+  .kpi{font-weight:600}
+  .profit-pos{color:#0a7a0a;font-weight:600}
+  .profit-neg{color:#b00020;font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+  .actions{display:flex;gap:6px;flex-wrap:wrap}
+</style>
+
+<style>
+  :root { --accent:#6b7280; --ink:#0f172a; --bg:#f7f8fc; --card:#ffffff; --line:#ebedf3; }
+  body{background:var(--bg); color:var(--ink)}
+  header{background:var(--accent); box-shadow:0 6px 16px rgba(0,0,0,.12)}
+  header h1{letter-spacing:.2px}
+  nav#tabs, .quicknav { display:none !important; }
+  main{max-width:1200px; margin:24px auto; padding:0 16px}
+  section{display:none !important}
+  #stmt-clients #stmt-suppliers #stmt-cash #stmt-expenses { display:block !important; }
+  .card{background:var(--card); border:1px solid var(--line); box-shadow:0 6px 18px rgba(17,24,39,.04); border-radius:16px; padding:16px}
+  h2{display:flex; align-items:center; gap:10px; font-size:18px; margin:4px 0 12px}
+  h2::before{content:""; width:10px; height:10px; border-radius:50%; background:var(--accent)}
+  table{background:#fff; border-radius:12px; overflow:hidden}
+  th{background:#fafafe}
+  .btn{background:var(--accent);}
+  .topbar{display:flex; gap:12px; align-items:center; justify-content:space-between; margin:12px 0 18px}
+  .breadcrumbs a{text-decoration:none; color:var(--accent); border:1px solid var(--line); padding:8px 10px; border-radius:10px; background:#fff}
+  .titlechip{font-weight:700; color:#fff; background:var(--accent); padding:6px 10px; border-radius:999px; box-shadow:0 6px 16px rgba(0,0,0,.15)}
+</style>
+<div class="topbar">
+  <div class="breadcrumbs">
+    <a href="index.html">🏠 Menu</a>
+  </div>
+  <div class="titlechip">Statements</div>
+</div>
+
+</head>
+<body>
+<header><h1>🚚 Gestion Transport v4 — Tout éditable (offline)</h1></header>
+<nav id="tabs"></nav>
+<main>
+
+<!-- Dashboard -->
+<section id="dashboard" class="active">
+  <div class="row">
+    <div class="card">
+      <h2>Trésorerie (CFA)</h2>
+      <p>Solde caisse: <span id="cash-balance" class="kpi">0</span></p>
+      <div class="grid2">
+        <div>
+          <label>Montant (CFA)</label>
+          <input type="number" id="cash-amount" placeholder="ex: 100000">
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="addCash(true)">Ajouter au solde</button>
+          <button class="btn danger" onclick="addCash(false)">Retirer du solde</button>
+        </div>
+      </div>
+      <p class="muted">Astuce: exportez le JSON régulièrement.</p>
+    </div>
+    <div class="card">
+      <h2>Totaux (mois en cours)</h2>
+      <p>Voyages: <span id="kpi-trips" class="kpi">0</span></p>
+      <p>Dépenses: <span id="kpi-exp" class="kpi">0</span> CFA</p>
+      <p>Paiements clients: <span id="kpi-payin" class="kpi">0</span> CFA</p>
+      <p>Paiements fournisseurs: <span id="kpi-payout" class="kpi">0</span> CFA</p>
+    </div>
+    <div class="card">
+      <h2>Export / Import</h2>
+      <div class="actions">
+        <button class="btn" onclick="exportJSON()">Exporter (JSON)</button>
+        <label class="btn secondary" style="cursor:pointer">
+          Importer JSON
+          <input type="file" accept="application/json" style="display:none" onchange="importJSON(event)">
+        </label>
+        <button class="btn secondary" onclick="wipeData()">Vider toutes les données</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <h2>Profit par Camion</h2>
+    <div class="row">
+      <div><label>Du</label><input type="date" id="profit-from"></div>
+      <div><label>Au</label><input type="date" id="profit-to"></div>
+      <div style="display:flex;align-items:end"><button class="btn" onclick="renderProfit()">Calculer</button></div>
+    </div>
+    <table id="profit-table" style="margin-top:10px">
+      <thead><tr><th>Camion</th><th>Revenus (voyages)</th><th>Frais de voyage</th><th>Dépenses liées</th><th>PROFIT</th></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><th>Total</th><th id="pt-rev">0</th><th id="pt-fees">0</th><th id="pt-exp">0</th><th id="pt-prof">0</th></tr></tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- Camions -->
+<section id="trucks">
+  <h2>Camions</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Nom du camion</label><input id="truck-name"></div>
+      <div><label>Immatriculation</label><input id="truck-plate"></div>
+      <div><label>Chauffeur</label><input id="truck-driver"></div>
+      <div><label>Statut</label>
+        <select id="truck-status"><option>Disponible</option><option>En voyage</option><option>Maintenance</option></select>
+      </div>
+      <div><label>Photo camion</label><input type="file" id="truck-photo" accept="image/*" capture="environment"></div>
+      <div style="display:flex;align-items:end" class="actions">
+        <button class="btn" onclick="addTruck()" id="truck-add">Ajouter</button>
+        <button class="btn secondary" onclick="resetTruckForm()" id="truck-cancel" style="display:none">Annuler</button>
+        <button class="btn" onclick="updateTruck()" id="truck-save" style="display:none">Enregistrer</button>
+      </div>
+    </div>
+    <input type="hidden" id="truck-edit-id">
+  </div>
+  <div class="card">
+    <table id="truck-table"><thead><tr><th>Nom</th><th>Immat.</th><th>Chauffeur</th><th>Photo</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- Clients -->
+<section id="clients">
+  <h2>Clients</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Nom client</label><input id="client-name"></div>
+      <div><label>Téléphone</label><input id="client-phone"></div>
+      <div><label>Adresse</label><input id="client-addr"></div>
+      <div style="display:flex;align-items:end" class="actions">
+        <button class="btn" onclick="addClient()" id="client-add">Ajouter</button>
+        <button class="btn secondary" onclick="resetClientForm()" id="client-cancel" style="display:none">Annuler</button>
+        <button class="btn" onclick="updateClient()" id="client-save" style="display:none">Enregistrer</button>
+      </div>
+    </div>
+    <input type="hidden" id="client-edit-id">
+  </div>
+  <div class="card">
+    <div class="row"><div><label>Filtrer</label><input id="client-filter" placeholder="rechercher..."></div></div>
+    <table id="client-table"><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th><th>Solde (CFA)</th><th>Crédit dispo</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- Fournisseurs -->
+<section id="suppliers">
+  <h2>Fournisseurs</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Nom fournisseur</label><input id="sup-name"></div>
+      <div><label>Téléphone</label><input id="sup-phone"></div>
+      <div><label>Adresse</label><input id="sup-addr"></div>
+      <div style="display:flex;align-items:end" class="actions">
+        <button class="btn" onclick="addSupplier()" id="sup-add">Ajouter</button>
+        <button class="btn secondary" onclick="resetSupplierForm()" id="sup-cancel" style="display:none">Annuler</button>
+        <button class="btn" onclick="updateSupplier()" id="sup-save" style="display:none">Enregistrer</button>
+      </div>
+    </div>
+    <input type="hidden" id="sup-edit-id">
+  </div>
+  <div class="card">
+    <div class="row"><div><label>Filtrer</label><input id="sup-filter" placeholder="rechercher..."></div></div>
+    <table id="sup-table"><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th><th>Solde (CFA)</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- Voyages -->
+<section id="trips">
+  <h2>Voyages</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Date</label><input type="date" id="trip-date"></div>
+      <div><label>Camion</label><select id="trip-truck"></select></div>
+      <div><label>Client</label><select id="trip-client"></select></div>
+      <div><label>Produit / Marchandise</label><input id="trip-item"></div>
+      <div><label>Quantité</label><input type="number" id="trip-qty"></div>
+      <div><label>Prix unitaire (CFA)</label><input type="number" id="trip-price"></div>
+      <div><label>Frais (péages, carburant, autres) (CFA)</label><input type="number" id="trip-fees" value="0"></div>
+      <div><label>Détail des frais</label><input id="trip-fees-note" placeholder="ex: Carburant 40L + péages"></div>
+      <div><label>Paiement client (ce voyage) — CFA</label><input type="number" id="trip-clientpay" value="0"><div class="muted" id="client-credit-info" style="margin-top:6px"></div><label style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="trip-use-credit"> Utiliser crédit (ne crée pas de paiement, pas de mouvement de caisse)</label></div>
+      <div><label>Payé ?</label><select id="trip-paid"><option>Non payé</option><option>Payé</option><option>Partiel</option></select></div>
+<div><label>Photo (bon, BL, preuve)</label><input type="file" id="trip-photo" accept="image/*" capture="environment"></div>
+      <div style="display:flex;align-items:end" class="actions">
+        <button class="btn" onclick="addTrip()" id="trip-add">Ajouter</button>
+        <button class="btn secondary" onclick="resetTripForm()" id="trip-cancel" style="display:none">Annuler</button>
+        <button class="btn" onclick="updateTrip()" id="trip-save" style="display:none">Enregistrer</button>
+      </div>
+    </div>
+    <input type="hidden" id="trip-edit-id">
+  </div>
+  <div class="card">
+    <div class="row"><div><label>Filtrer</label><input id="trip-filter" placeholder="rechercher par camion, client, article, note frais..."></div></div>
+    <table id="trip-table"><thead><tr><th>Date</th><th>Camion</th><th>Client</th><th>Article</th><th>Qté</th><th>PU</th><th>Total</th><th>Frais</th><th>Détail frais</th><th>Photo</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- Dépenses -->
+<section id="expenses">
+  <h2>Dépenses</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Date</label><input type="date" id="exp-date"></div>
+      <div><label>Catégorie (libre)</label><input id="exp-cat" list="exp-cats" placeholder="Carburant, Maintenance, ...">
+        <datalist id="exp-cats"><option>Carburant</option><option>Maintenance</option><option>Pièces</option><option>Salaires</option><option>Ration</option><option>Frais divers</option></datalist>
+      </div>
+      <div><label>Fournisseur (optionnel)</label><select id="exp-supplier"></select></div>
+      <div><label>Camion (optionnel)</label><select id="exp-truck"></select></div>
+      <div><label>Montant (CFA)</label><input type="number" id="exp-amount"></div>
+      <div><label>Note</label><input id="exp-note" placeholder="ex: Bon N°123, détails..."></div>
+      <div><label>Payé ?</label><select id="exp-paid"><option>Non payé</option><option>Payé</option></select></div>
+<div><label>Photo (reçu/facture)</label><input type="file" id="exp-photo" accept="image/*" capture="environment"></div>
+      <div style="display:flex;align-items:end" class="actions">
+        <button class="btn" onclick="addExpense()" id="exp-add">Ajouter</button>
+        <button class="btn secondary" onclick="resetExpenseForm()" id="exp-cancel" style="display:none">Annuler</button>
+        <button class="btn" onclick="updateExpense()" id="exp-save" style="display:none">Enregistrer</button>
+      </div>
+    </div>
+    <input type="hidden" id="exp-edit-id">
+  </div>
+  <div class="card">
+    <div class="row"><div><label>Filtrer</label><input id="exp-filter" placeholder="rechercher par catégorie, fournisseur, camion..."></div></div>
+    <table id="exp-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Fournisseur</th><th>Camion</th><th>Montant</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- Paiements -->
+<section id="payments">
+  <h2>Paiements</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Type</label><select id="pay-type"><option value="encaissement">Encaissement (du client)</option><option value="decaissement">Décaissement (au fournisseur)</option></select></div>
+      <div><label>Date</label><input type="date" id="pay-date"></div>
+      <div><label>Client / Fournisseur</label><select id="pay-counterparty"></select></div>
+      <div><label>Montant (CFA)</label><input type="number" id="pay-amount"></div>
+      <div><label>Note</label><input id="pay-note" placeholder="Référence, mode, etc."></div>
+<div><label>Photo (preuve)</label><input type="file" id="pay-photo" accept="image/*" capture="environment"></div>
+      <div style="display:flex;align-items:end" class="actions">
+        <button class="btn" onclick="addPayment()" id="pay-add">Ajouter</button>
+        <button class="btn secondary" onclick="resetPaymentForm()" id="pay-cancel" style="display:none">Annuler</button>
+        <button class="btn" onclick="updatePayment()" id="pay-save" style="display:none">Enregistrer</button>
+      </div>
+    </div>
+    <input type="hidden" id="pay-edit-id">
+  </div>
+  <div class="card">
+    <div class="row"><div><label>Filtrer</label><input id="pay-filter" placeholder="rechercher par client, fournisseur, note..."></div></div>
+    <table id="pay-table"><thead><tr><th>Date</th><th>Type</th><th>Contrepartie</th><th>Montant</th><th>Photo</th><th>Note</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- Relevés séparés -->
+<section id="stmt-clients">
+  <h2>Relevé — Clients</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Client</label><select id="stmt-client"></select></div>
+      <div><label>Du</label><input type="date" id="stmtc-from"></div>
+      <div><label>Au</label><input type="date" id="stmtc-to"></div>
+      <div style="display:flex;align-items:end"><button class="btn" onclick="renderStmtClient()">Afficher</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div id="stmtc-summary" class="muted"></div>
+    <table id="stmtc-table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="nowrap">Débit (-)</th><th class="nowrap">Crédit (+)</th><th>Solde</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<section id="stmt-suppliers">
+  <h2>Relevé — Fournisseurs</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Fournisseur</label><select id="stmt-supplier"></select></div>
+      <div><label>Du</label><input type="date" id="stmts-from"></div>
+      <div><label>Au</label><input type="date" id="stmts-to"></div>
+      <div style="display:flex;align-items:end"><button class="btn" onclick="renderStmtSupplier()">Afficher</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div id="stmts-summary" class="muted"></div>
+    <table id="stmts-table"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="nowrap">Débit (-)</th><th class="nowrap">Crédit (+)</th><th>Solde</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<section id="stmt-cash">
+  <h2>Relevé — Trésorerie (Caisse)</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Du</label><input type="date" id="stmtcash-from"></div>
+      <div><label>Au</label><input type="date" id="stmtcash-to"></div>
+      <div style="display:flex;align-items:end"><button class="btn" onclick="renderStmtCash()">Afficher</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div id="stmtcash-summary" class="muted"></div>
+    <table id="stmtcash-table"><thead><tr><th>Date</th><th>Mouvement</th><th>Description</th><th class="nowrap">Débit (-)</th><th class="nowrap">Crédit (+)</th><th>Solde</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<section id="stmt-expenses">
+  <h2>Relevé — Dépenses Globales</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Du</label><input type="date" id="stmtexp-from"></div>
+      <div><label>Au</label><input type="date" id="stmtexp-to"></div>
+      <div><label>Filtrer</label><input id="stmtexp-filter" placeholder="catégorie, fournisseur, camion, note..."></div>
+      <div style="display:flex;align-items:end"><button class="btn" onclick="renderStmtExpenses()">Afficher</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div id="stmtexp-summary" class="muted"></div>
+    <table id="stmtexp-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Fournisseur</th><th>Camion</th><th class="nowrap">Montant</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<section id="help"><h2>Aide</h2>
+  <ol>
+    <li>Ajoutez Camions, Clients, Fournisseurs.</li>
+    <li>Saisissez Voyages, Dépenses, Paiements.</li>
+    <li>Modifiez <b>n’importe quel</b> enregistrement via le bouton “Modifier”.</li>
+    <li>Consultez Profit & Relevés, exportez votre sauvegarde JSON.</li>
+  </ol>
+</section>
+
+</main>
+
+<script>
+const KEY='transport_app_v4_full_edit';
+function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{cash:0,trucks:[],clients:[],suppliers:[],trips:[],expenses:[],payments:[],cashMoves:[]};}catch(e){return {cash:0,trucks:[],clients:[],suppliers:[],trips:[],expenses:[],payments:[],cashMoves:[]};} }
+function save(x){ localStorage.setItem(KEY, JSON.stringify(x)); refreshAll(); updateClientCreditInfo && updateClientCreditInfo();
+
+// Show client credit when client changes
+function updateClientCreditInfo(){
+  const cid = document.getElementById('trip-client').value;
+  const el = document.getElementById('client-credit-info');
+  if(!cid || !el){ return; }
+  const inv = db.trips.filter(t=>t.clientId===cid).reduce((s,t)=>s+t.total+(Number(t.fees)||0)-(Number(t.clientPay)||0),0);
+  const pay = db.payments.filter(p=>p.type==='encaissement' && p.counterpartyId===cid).reduce((s,p)=>s+p.amount,0);
+  const credit = Math.max(0, pay - inv);
+  el.textContent = 'Crédit disponible: ' + fmt(credit) + ' CFA';
+}
+document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='trip-client'){ updateClientCreditInfo(); } });
+document.addEventListener('input', (e)=>{ if(e.target && e.target.id==='trip-client'){ updateClientCreditInfo(); } });
+
+updateClientCreditInfo(); }
+let db = load();
+
+// --- Image helpers ---
+function readImageFile(inputEl, maxW=1200, maxH=1200){
+  return new Promise((resolve)=>{
+    const file = inputEl?.files?.[0];
+    if(!file){ return resolve(null); }
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        const ratio = Math.min(maxW / w, maxH / h, 1);
+        if(ratio < 1){
+          w = Math.round(w * ratio); h = Math.round(h * ratio);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          resolve(reader.result); // already small
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function fmt(n){ return (Number(n)||0).toLocaleString('fr-FR'); }
+function today(){ return new Date().toISOString().slice(0,10); }
+
+// Tabs
+const tabs=[
+  ['dashboard','Tableau de bord'],
+  ['trucks','Camions'],
+  ['clients','Clients'],
+  ['suppliers','Fournisseurs'],
+  ['trips','Voyages'],
+  ['expenses','Dépenses'],
+  ['payments','Paiements'],
+  ['stmt-clients','Relevé Clients'],
+  ['stmt-suppliers','Relevé Fournisseurs'],
+  ['stmt-cash','Relevé Trésorerie'],
+  ['stmt-expenses','Relevé Dépenses'],
+  ['help','Aide']
+];
+const tabsEl=document.getElementById('tabs');
+tabs.forEach(([id,label],i)=>{ const b=document.createElement('button'); b.textContent=label; b.onclick=()=>activateTab(id,b); if(i===0)b.classList.add('active'); tabsEl.appendChild(b); });
+function activateTab(id,btn){ document.querySelectorAll('section').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); }
+
+// Cash add/remove + log
+function addCash(add=true){
+  const amt=Number(document.getElementById('cash-amount').value||0);
+  if(!amt) return;
+  db.cash += add?amt:-amt;
+  db.cashMoves.push({date:today(), type:add?'Ajout':'Retrait', desc:add?'Ajout manuel':'Retrait manuel', debit:add?0:amt, credit:add?amt:0});
+  save(db);
+  document.getElementById('cash-amount').value='';
+}
+
+// TRUCKS CRUD
+function resetTruckForm(){ document.getElementById('truck-edit-id').value=''; document.getElementById('truck-name').value=''; document.getElementById('truck-plate').value=''; document.getElementById('truck-driver').value=''; document.getElementById('truck-status').value='Disponible'; const f=document.getElementById('truck-photo'); if(f) f.value=''; document.getElementById('truck-add').style.display='inline-block'; document.getElementById('truck-cancel').style.display='none'; document.getElementById('truck-save').style.display='none'; }
+async function addTruck(){ const name=document.getElementById('truck-name').value.trim(); if(!name)return; const plate=document.getElementById('truck-plate').value.trim(); const driver=document.getElementById('truck-driver').value.trim(); const status=document.getElementById('truck-status').value; const photo = await readImageFile(document.getElementById('truck-photo'));
+  db.trucks.push({id:crypto.randomUUID(), name, plate, driver, status, photo}); save(db); resetTruckForm(); }
+function editTruck(id){ const t=db.trucks.find(x=>x.id===id); if(!t)return; document.getElementById('truck-edit-id').value=t.id; document.getElementById('truck-name').value=t.name; document.getElementById('truck-plate').value=t.plate||''; document.getElementById('truck-driver').value=t.driver||''; document.getElementById('truck-status').value=t.status||'Disponible'; document.getElementById('truck-add').style.display='none'; document.getElementById('truck-cancel').style.display='inline-block'; document.getElementById('truck-save').style.display='inline-block'; }
+async function updateTruck(){ const id=document.getElementById('truck-edit-id').value; if(!id)return; const t=db.trucks.find(x=>x.id===id); if(!t)return; t.name=document.getElementById('truck-name').value.trim(); t.plate=document.getElementById('truck-plate').value.trim(); t.driver=document.getElementById('truck-driver').value.trim(); t.status=document.getElementById('truck-status').value; const newPhoto=await readImageFile(document.getElementById('truck-photo')); if(newPhoto){ t.photo=newPhoto; } save(db); resetTruckForm(); }
+function delTruck(id){ db.trucks=db.trucks.filter(t=>t.id!==id); save(db); }
+
+// CLIENTS CRUD
+function resetClientForm(){ document.getElementById('client-edit-id').value=''; document.getElementById('client-name').value=''; document.getElementById('client-phone').value=''; document.getElementById('client-addr').value=''; document.getElementById('client-add').style.display='inline-block'; document.getElementById('client-cancel').style.display='none'; document.getElementById('client-save').style.display='none'; }
+function addClient(){ const name=document.getElementById('client-name').value.trim(); if(!name)return; const phone=document.getElementById('client-phone').value.trim(); const addr=document.getElementById('client-addr').value.trim(); db.clients.push({id:crypto.randomUUID(), name, phone, addr}); save(db); resetClientForm(); }
+function editClient(id){ const c=db.clients.find(x=>x.id===id); if(!c)return; document.getElementById('client-edit-id').value=c.id; document.getElementById('client-name').value=c.name; document.getElementById('client-phone').value=c.phone||''; document.getElementById('client-addr').value=c.addr||''; document.getElementById('client-add').style.display='none'; document.getElementById('client-cancel').style.display='inline-block'; document.getElementById('client-save').style.display='inline-block'; }
+function updateClient(){ const id=document.getElementById('client-edit-id').value; if(!id)return; const c=db.clients.find(x=>x.id===id); if(!c)return; c.name=document.getElementById('client-name').value.trim(); c.phone=document.getElementById('client-phone').value.trim(); c.addr=document.getElementById('client-addr').value.trim(); save(db); resetClientForm(); }
+function delClient(id){ db.clients=db.clients.filter(c=>c.id!==id); save(db); }
+
+// SUPPLIERS CRUD
+function resetSupplierForm(){ document.getElementById('sup-edit-id').value=''; document.getElementById('sup-name').value=''; document.getElementById('sup-phone').value=''; document.getElementById('sup-addr').value=''; document.getElementById('sup-add').style.display='inline-block'; document.getElementById('sup-cancel').style.display='none'; document.getElementById('sup-save').style.display='none'; }
+function addSupplier(){ const name=document.getElementById('sup-name').value.trim(); if(!name)return; const phone=document.getElementById('sup-phone').value.trim(); const addr=document.getElementById('sup-addr').value.trim(); db.suppliers.push({id:crypto.randomUUID(), name, phone, addr}); save(db); resetSupplierForm(); }
+function editSupplier(id){ const s=db.suppliers.find(x=>x.id===id); if(!s)return; document.getElementById('sup-edit-id').value=s.id; document.getElementById('sup-name').value=s.name; document.getElementById('sup-phone').value=s.phone||''; document.getElementById('sup-addr').value=s.addr||''; document.getElementById('sup-add').style.display='none'; document.getElementById('sup-cancel').style.display='inline-block'; document.getElementById('sup-save').style.display='inline-block'; }
+function updateSupplier(){ const id=document.getElementById('sup-edit-id').value; if(!id)return; const s=db.suppliers.find(x=>x.id===id); if(!s)return; s.name=document.getElementById('sup-name').value.trim(); s.phone=document.getElementById('sup-phone').value.trim(); s.addr=document.getElementById('sup-addr').value.trim(); save(db); resetSupplierForm(); }
+function delSupplier(id){ db.suppliers=db.suppliers.filter(s=>s.id!==id); save(db); }
+
+// TRIPS CRUD
+function resetTripForm(){ document.getElementById('trip-edit-id').value=''; document.getElementById('trip-date').value=''; document.getElementById('trip-truck').value=''; document.getElementById('trip-client').value=''; document.getElementById('trip-item').value=''; document.getElementById('trip-qty').value=''; document.getElementById('trip-price').value=''; document.getElementById('trip-fees').value='0'; document.getElementById('trip-fees-note').value=''; document.getElementById('trip-paid').value='Non payé'; document.getElementById('trip-add').style.display='inline-block'; document.getElementById('trip-cancel').style.display='none'; document.getElementById('trip-save').style.display='none'; }
+async function addTrip(){ const date=document.getElementById('trip-date').value||today(); const truckId=document.getElementById('trip-truck').value; const clientId=document.getElementById('trip-client').value; const item=document.getElementById('trip-item').value.trim(); const qty=Number(document.getElementById('trip-qty').value||0); const price=Number(document.getElementById('trip-price').value||0); const fees=Number(document.getElementById('trip-fees').value||0);
+  const feesNote=document.getElementById('trip-fees-note').value.trim();
+  const paid=document.getElementById('trip-paid').value; if(!truckId||!clientId||!item||!qty||!price)return; const total=qty*price; const photo = await readImageFile(document.getElementById('trip-photo'));
+  db.trips.push({id:crypto.randomUUID(), date, truckId, clientId, item, qty, price, total, fees, feesNote, photo, paid}); if(paid==='Payé'){ db.cash += (total - fees); db.cashMoves.push({date, type:'Encaissement voyage', desc:item, debit:0, credit:(total-fees)}); } save(db); resetTripForm(); }
+function editTrip(id){ const t=db.trips.find(x=>x.id===id); if(!t)return; document.getElementById('trip-edit-id').value=t.id; document.getElementById('trip-date').value=t.date; document.getElementById('trip-truck').value=t.truckId; document.getElementById('trip-client').value=t.clientId; document.getElementById('trip-item').value=t.item; document.getElementById('trip-qty').value=t.qty; document.getElementById('trip-price').value=t.price; document.getElementById('trip-fees').value=t.fees||0; document.getElementById('trip-fees-note').value=t.feesNote||''; document.getElementById('trip-clientpay').value=t.clientPay||0; document.getElementById('trip-paid').value=t.paid; document.getElementById('trip-add').style.display='none'; document.getElementById('trip-cancel').style.display='inline-block'; document.getElementById('trip-save').style.display='inline-block'; }
+async function updateTrip(){ const id=document.getElementById('trip-edit-id').value; if(!id)return; const t=db.trips.find(x=>x.id===id); if(!t)return; const oldPaid=t.paid, oldNet=(t.total - (Number(t.fees)||0) - (Number(t.clientPay)||0));
+  t.date=document.getElementById('trip-date').value||today(); t.truckId=document.getElementById('trip-truck').value; t.clientId=document.getElementById('trip-client').value; t.item=document.getElementById('trip-item').value.trim(); t.qty=Number(document.getElementById('trip-qty').value||0); t.price=Number(document.getElementById('trip-price').value||0); t.total=t.qty*t.price; t.fees=Number(document.getElementById('trip-fees').value||0); t.feesNote=document.getElementById('trip-fees-note').value.trim(); const newPhoto = await readImageFile(document.getElementById('trip-photo')); if(newPhoto){ t.photo=newPhoto; }
+  const newClientPay = Number(document.getElementById('trip-clientpay').value||0);
+  const useCredit = document.getElementById('trip-use-credit')?.checked;
+  // reverse old linked client payment only if previous pay was cash
+  if(t.clientPayId){ const p=db.payments.find(x=>x.id===t.clientPayId); if(p){ db.cash -= p.amount; } db.payments = db.payments.filter(x=>x.id!==t.clientPayId); t.clientPayId=null; }
+  t.clientPay=newClientPay; t.clientPaySource = useCredit ? 'credit' : 'cash';
+  if(newClientPay>0 && !useCredit){ const newId=crypto.randomUUID(); t.clientPayId=newId; db.payments.push({id:newId, type:'encaissement', date:t.date, counterpartyId:t.clientId, amount:newClientPay, note:`Paiement voyage: ${t.item}`}); db.cash += newClientPay; db.cashMoves.push({date:t.date, type:'Encaissement', desc:`Paiement (voyage ${t.item})`, debit:0, credit:newClientPay}); }
+  t.paid=document.getElementById('trip-paid').value; // Adjust cash if status changed or values changed
+  if(oldPaid==='Payé'){ db.cash -= oldNet; }
+  const residual = t.total - t.fees - newClientPay; if(t.paid==='Payé' && residual>0){ db.cash += residual; db.cashMoves.push({date:t.date, type:'Encaissement voyage (modifié)', desc:t.item, debit:0, credit:residual}); }
+  save(db); resetTripForm(); updateClientCreditInfo(); }
+function delTrip(id){ const t=db.trips.find(x=>x.id===id); db.trips=db.trips.filter(x=>x.id!==id); if(t){ if(t.clientPayId){ const p=db.payments.find(x=>x.id===t.clientPayId); if(p){ db.cash -= p.amount; } db.payments = db.payments.filter(x=>x.id!==t.clientPayId); } if(t.paid==='Payé'){ db.cash -= (t.total - (Number(t.fees)||0) - (Number(t.clientPay)||0)); db.cashMoves.push({date:today(), type:'Annulation voyage', desc:t.item, debit:(t.total - (Number(t.fees)||0) - (Number(t.clientPay)||0)), credit:0}); } } save(db); }
+
+// EXPENSES CRUD
+function resetExpenseForm(){ document.getElementById('exp-edit-id').value=''; document.getElementById('exp-date').value=''; document.getElementById('exp-cat').value=''; document.getElementById('exp-supplier').value=''; document.getElementById('exp-truck').value=''; document.getElementById('exp-amount').value=''; document.getElementById('exp-note').value=''; document.getElementById('exp-paid').value='Non payé'; const f=document.getElementById('exp-photo'); if(f) f.value=''; document.getElementById('exp-add').style.display='inline-block'; document.getElementById('exp-cancel').style.display='none'; document.getElementById('exp-save').style.display='none'; }
+async function addExpense(){ const date=document.getElementById('exp-date').value||today(); const cat=document.getElementById('exp-cat').value.trim(); const supplierId=document.getElementById('exp-supplier').value||null; const truckId=document.getElementById('exp-truck').value||null; const amount=Number(document.getElementById('exp-amount').value||0); const paid=document.getElementById('exp-paid').value; if(!cat||!amount)return; const id=crypto.randomUUID(); const photo = await readImageFile(document.getElementById('exp-photo'));
+  db.expenses.push({id,date,cat,supplierId,truckId,amount,photo,note:document.getElementById('exp-note').value.trim(),paid}); if(paid==='Payé'){ db.cash-=amount; db.cashMoves.push({date, type:'Dépense', desc:cat, debit:amount, credit:0}); } save(db); resetExpenseForm(); }
+function editExpense(id){ const e=db.expenses.find(x=>x.id===id); if(!e)return; document.getElementById('exp-edit-id').value=e.id; document.getElementById('exp-date').value=e.date; document.getElementById('exp-cat').value=e.cat; document.getElementById('exp-supplier').value=e.supplierId||''; document.getElementById('exp-truck').value=e.truckId||''; document.getElementById('exp-amount').value=e.amount; document.getElementById('exp-paid').value=e.paid; document.getElementById('exp-add').style.display='none'; document.getElementById('exp-cancel').style.display='inline-block'; document.getElementById('exp-save').style.display='inline-block'; }
+async function updateExpense(){ const id=document.getElementById('exp-edit-id').value; if(!id)return; const e=db.expenses.find(x=>x.id===id); if(!e)return; const oldPaid=e.paid, oldAmount=e.amount; e.date=document.getElementById('exp-date').value||today(); e.cat=document.getElementById('exp-cat').value.trim(); e.supplierId=document.getElementById('exp-supplier').value||null; e.truckId=document.getElementById('exp-truck').value||null; e.amount=Number(document.getElementById('exp-amount').value||0); const newPhoto = await readImageFile(document.getElementById('exp-photo')); if(newPhoto){ e.photo=newPhoto; } e.note=document.getElementById('exp-note').value.trim(); e.paid=document.getElementById('exp-paid').value; if(oldPaid==='Payé'){ db.cash += oldAmount; } if(e.paid==='Payé'){ db.cash -= e.amount; db.cashMoves.push({date:e.date, type:'Dépense (modifiée)', desc:e.cat, debit:e.amount, credit:0}); } save(db); resetExpenseForm(); }
+function delExpense(id){ const e=db.expenses.find(x=>x.id===id); db.expenses=db.expenses.filter(x=>x.id!==id); if(e && e.paid==='Payé'){ db.cash += e.amount; db.cashMoves.push({date:today(), type:'Annulation dépense', desc:e.cat, debit:0, credit:e.amount}); } save(db); }
+
+// PAYMENTS CRUD
+function resetPaymentForm(){ document.getElementById('pay-edit-id').value=''; document.getElementById('pay-type').value='encaissement'; document.getElementById('pay-date').value=''; document.getElementById('pay-counterparty').value=''; document.getElementById('pay-amount').value=''; document.getElementById('pay-note').value=''; const f=document.getElementById('pay-photo'); if(f) f.value=''; document.getElementById('pay-add').style.display='inline-block'; document.getElementById('pay-cancel').style.display='none'; document.getElementById('pay-save').style.display='none'; }
+async function addPayment(){ const type=document.getElementById('pay-type').value; const date=document.getElementById('pay-date').value||today(); const cp=document.getElementById('pay-counterparty').value; const amount=Number(document.getElementById('pay-amount').value||0); const note=document.getElementById('pay-note').value.trim(); if(!cp||!amount)return; const photo = await readImageFile(document.getElementById('pay-photo'));
+  db.payments.push({id:crypto.randomUUID(), type, date, counterpartyId:cp, amount, note, photo}); if(type==='encaissement'){ db.cash += amount; db.cashMoves.push({date, type:'Encaissement', desc:note||'Paiement client', debit:0, credit:amount}); } else { db.cash -= amount; db.cashMoves.push({date, type:'Décaissement', desc:note||'Paiement fournisseur', debit:amount, credit:0}); } save(db); resetPaymentForm(); }
+function editPayment(id){ const p=db.payments.find(x=>x.id===id); if(!p)return; document.getElementById('pay-edit-id').value=p.id; document.getElementById('pay-type').value=p.type; document.getElementById('pay-date').value=p.date; document.getElementById('pay-counterparty').value=p.counterpartyId; document.getElementById('pay-amount').value=p.amount; document.getElementById('pay-note').value=p.note||''; document.getElementById('pay-add').style.display='none'; document.getElementById('pay-cancel').style.display='inline-block'; document.getElementById('pay-save').style.display='inline-block'; }
+async function updatePayment(){ const id=document.getElementById('pay-edit-id').value; if(!id)return; const p=db.payments.find(x=>x.id===id); if(!p)return; // reverse old effect
+  if(p.type==='encaissement'){ db.cash -= p.amount; } else { db.cash += p.amount; }
+  p.type=document.getElementById('pay-type').value; p.date=document.getElementById('pay-date').value||today(); p.counterpartyId=document.getElementById('pay-counterparty').value; p.amount=Number(document.getElementById('pay-amount').value||0); p.note=document.getElementById('pay-note').value.trim(); const newPhoto = await readImageFile(document.getElementById('pay-photo')); if(newPhoto){ p.photo=newPhoto; }
+  if(p.type==='encaissement'){ db.cash += p.amount; db.cashMoves.push({date:p.date, type:'Encaissement (modifié)', desc:p.note||'', debit:0, credit:p.amount}); } else { db.cash -= p.amount; db.cashMoves.push({date:p.date, type:'Décaissement (modifié)', desc:p.note||'', debit:p.amount, credit:0}); }
+  save(db); resetPaymentForm(); }
+function delPayment(id){ const p=db.payments.find(x=>x.id===id); db.payments=db.payments.filter(x=>x.id!==id); if(p){ if(p.type==='encaissement'){ db.cash -= p.amount; } else { db.cash += p.amount; } db.cashMoves.push({date:today(), type:'Annulation paiement', desc:p.type, debit:p.type==='encaissement'?p.amount:0, credit:p.type==='decaissement'?p.amount:0}); } save(db); }
+
+// Statements helpers
+function within(d, a, b){ return d>=(a||'0000-01-01') && d<=(b||'9999-12-31'); }
+function renderStmtClient(){
+  const id=document.getElementById('stmt-client').value; if(!id) return;
+  const from=document.getElementById('stmtc-from').value; const to=document.getElementById('stmtc-to').value;
+  const c=db.clients.find(x=>x.id===id); const tbody=document.querySelector('#stmtc-table tbody'); tbody.innerHTML='';
+  let lines=[];
+  db.trips.filter(t=>t.clientId===id && within(t.date,from,to)).forEach(t=>{
+    lines.push({date:t.date, type:'Facture', desc:`Voyage ${t.item} x${t.qty} PU ${fmt(t.price)} CFA${t.feesNote?(' — Frais: '+t.feesNote):''}${t.clientPay?(' — Paiement reçu: '+fmt(t.clientPay)+' CFA'):''}`, debit:t.total+(Number(t.fees)||0), credit:0});
+  });
+  db.payments.filter(p=>p.type==='encaissement' && p.counterpartyId===id && within(p.date,from,to))
+    .forEach(p=>lines.push({date:p.date, type:'Règlement', desc:p.note||'Paiement', debit:0, credit:p.amount}));
+  lines.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('stmtc-summary').textContent=`${c?.name||''} — Période ${from||'...'} → ${to||'...'}`;
+  let bal=0; lines.forEach(L=>{ bal += (L.debit - L.credit); const tr=document.createElement('tr'); tr.innerHTML=`<td>${L.date}</td><td>${L.type}</td><td>${L.desc}</td><td class="nowrap">${fmt(L.debit)}</td><td class="nowrap">${fmt(L.credit)}</td><td class="nowrap">${fmt(bal)}</td>`; tbody.appendChild(tr); });
+}
+function renderStmtSupplier(){
+  const id=document.getElementById('stmt-supplier').value; if(!id) return;
+  const from=document.getElementById('stmts-from').value; const to=document.getElementById('stmts-to').value;
+  const s=db.suppliers.find(x=>x.id===id); const tbody=document.querySelector('#stmts-table tbody'); tbody.innerHTML='';
+  let lines=[];
+  db.expenses.filter(e=>e.supplierId===id && within(e.date,from,to)).forEach(e=>{
+    lines.push({date:e.date, type:'Achat', desc:(e.cat + (e.note?(' — '+e.note):'')), debit:e.amount, credit:0});
+  });
+  db.payments.filter(p=>p.type==='decaissement' && p.counterpartyId===id && within(p.date,from,to))
+    .forEach(p=>lines.push({date:p.date, type:'Règlement', desc:p.note||'Paiement', debit:0, credit:p.amount}));
+  lines.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('stmts-summary').textContent=`${s?.name||''} — Période ${from||'...'} → ${to||'...'}`;
+  let bal=0; lines.forEach(L=>{ bal += (L.debit - L.credit); const tr=document.createElement('tr'); tr.innerHTML=`<td>${L.date}</td><td>${L.type}</td><td>${L.desc}</td><td class="nowrap">${fmt(L.debit)}</td><td class="nowrap">${fmt(L.credit)}</td><td class="nowrap">${fmt(bal)}</td>`; tbody.appendChild(tr); });
+}
+function renderStmtCash(){
+  const from=document.getElementById('stmtcash-from').value; const to=document.getElementById('stmtcash-to').value;
+  const tbody=document.querySelector('#stmtcash-table tbody'); tbody.innerHTML='';
+  let lines = db.cashMoves.filter(m=>within(m.date,from,to)).sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('stmtcash-summary').textContent=`Période ${from||'...'} → ${to||'...'}`;
+  let bal=0; lines.forEach(L=>{ bal += (L.debit - L.credit); const tr=document.createElement('tr'); tr.innerHTML=`<td>${L.date}</td><td>${L.type}</td><td>${L.desc||''}</td><td class="nowrap">${fmt(L.debit||0)}</td><td class="nowrap">${fmt(L.credit||0)}</td><td class="nowrap">${fmt(db.cash - (bal))}</td>`; tbody.appendChild(tr); });
+}
+function renderStmtExpenses(){
+  const from=document.getElementById('stmtexp-from').value; const to=document.getElementById('stmtexp-to').value;
+  const tbody=document.querySelector('#stmtexp-table tbody'); tbody.innerHTML='';
+  let rows=db.expenses.filter(e=>within(e.date,from,to)).sort((a,b)=>a.date.localeCompare(b.date));
+  const q=(document.getElementById('stmtexp-filter')?.value||'').toLowerCase();
+  if(q){ rows = rows.filter(e=>{ const sup=e.supplierId ? (db.suppliers.find(x=>x.id===e.supplierId)?.name||'') : ''; const trk=e.truckId ? (db.trucks.find(x=>x.id===e.truckId)?.name||'') : ''; const hay=[e.date,e.cat,sup,trk,e.note||''].join(' ').toLowerCase(); return hay.includes(q); }); }
+  document.getElementById('stmtexp-summary').textContent=`Période ${from||'...'} → ${to||'...'} — Total: ${fmt(rows.reduce((s,e)=>s+e.amount,0))} CFA`;
+  rows.forEach(e=>{
+    const sup=e.supplierId ? (db.suppliers.find(x=>x.id===e.supplierId)?.name||'') : '';
+    const trk=e.truckId ? (db.trucks.find(x=>x.id===e.truckId)?.name||'') : '';
+    const tr=document.createElement('tr'); tr.innerHTML=`<td>${e.date}</td><td>${e.cat}</td><td>${sup}</td><td>${trk}</td><td class=\"nowrap\">${fmt(e.amount)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// PROFIT
+function renderProfit(){
+  const from=document.getElementById('profit-from').value; const to=document.getElementById('profit-to').value;
+  const tbody=document.querySelector('#profit-table tbody'); tbody.innerHTML='';
+  let totalRev=0,totalFees=0,totalExp=0,totalProf=0;
+  db.trucks.forEach(t=>{
+    const trips=db.trips.filter(x=>x.truckId===t.id && within(x.date,from,to));
+    const rev=trips.reduce((s,x)=>s+x.total,0);
+    const fees=trips.reduce((s,x)=>s+(Number(x.fees)||0),0);
+    const exps=db.expenses.filter(e=>e.truckId===t.id && within(e.date,from,to)).reduce((s,e)=>s+e.amount,0);
+    const prof=rev - fees - exps;
+    totalRev+=rev; totalFees+=fees; totalExp+=exps; totalProf+=prof;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${t.name}</td><td class="nowrap">${fmt(rev)}</td><td class="nowrap">${fmt(fees)}</td><td class="nowrap">${fmt(exps)}</td><td class="${prof>=0?'profit-pos':'profit-neg'} nowrap">${fmt(prof)}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('pt-rev').textContent=fmt(totalRev);
+  document.getElementById('pt-fees').textContent=fmt(totalFees);
+  document.getElementById('pt-exp').textContent=fmt(totalExp);
+  document.getElementById('pt-prof').textContent=fmt(totalProf);
+}
+
+// Export/Import/Wipe
+function exportJSON(){ const data=JSON.stringify(db,null,2); const blob=new Blob([data],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='transport_data_backup_v4.json'; a.click(); URL.revokeObjectURL(url); }
+function importJSON(ev){ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ db=JSON.parse(r.result); save(db); alert('Import terminé ✅'); }catch(e){ alert('Fichier invalide ❌'); } }; r.readAsText(f); }
+function wipeData(){ if(confirm('Supprimer TOUTES les données ?')){ db={cash:0,trucks:[],clients:[],suppliers:[],trips:[],expenses:[],payments:[],cashMoves:[]}; save(db); } }
+
+// Rendering
+function refreshAll(){
+  document.getElementById('cash-balance').textContent=fmt(db.cash);
+  const now=new Date(); const y=now.getFullYear(), m=(now.getMonth()+1).toString().padStart(2,'0'); const pref=`${y}-${m}-`;
+  const tripsMonth=db.trips.filter(t=>t.date?.startsWith(pref)).length;
+  const expMonth=db.expenses.filter(e=>e.date?.startsWith(pref)).reduce((s,e)=>s+e.amount,0);
+  const payInMonth=db.payments.filter(p=>p.type==='encaissement' && p.date?.startsWith(pref)).reduce((s,p)=>s+p.amount,0);
+  const payOutMonth=db.payments.filter(p=>p.type==='decaissement' && p.date?.startsWith(pref)).reduce((s,p)=>s+p.amount,0);
+  document.getElementById('kpi-trips').textContent=fmt(tripsMonth);
+  document.getElementById('kpi-exp').textContent=fmt(expMonth);
+  document.getElementById('kpi-payin').textContent=fmt(payInMonth);
+  document.getElementById('kpi-payout').textContent=fmt(payOutMonth);
+
+  // Dropdowns
+  const tripTruck=document.getElementById('trip-truck'); const expTruck=document.getElementById('exp-truck');
+  [tripTruck,expTruck].forEach(sel=>{ sel.innerHTML='<option value="">—</option>'; db.trucks.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; sel.appendChild(o); }); });
+  const tripClient=document.getElementById('trip-client'); const payCounter=document.getElementById('pay-counterparty'); const stmtClient=document.getElementById('stmt-client');
+  [tripClient,payCounter,stmtClient].forEach(sel=>{ sel.innerHTML=''; db.clients.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent='Client: '+c.name; sel.appendChild(o); }); db.suppliers.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent='Fournisseur: '+s.name; sel.appendChild(o); }); });
+  const expSupplier=document.getElementById('exp-supplier'); const stmtSupplier=document.getElementById('stmt-supplier');
+  [expSupplier,stmtSupplier].forEach(sel=>{ sel.innerHTML='<option value="">—</option>'; db.suppliers.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.name; sel.appendChild(o); }); });
+
+  // Tables
+  const ttb=document.querySelector('#truck-table tbody'); ttb.innerHTML=''; db.trucks.forEach(t=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${t.name}</td><td>${t.plate||''}</td><td>${t.driver||''}</td><td>${t.photo?('<a href=\''+t.photo+\' target=\'_blank\'><img src=\''+t.photo+\' style=\'height:36px;border-radius:6px\'></a>'):''}</td><td><span class=\"pill\">${t.status}</span></td><td class=\"actions\"><button class=\"btn secondary\" onclick=\"editTruck('${t.id}')\">Modifier</button> <button class=\"btn danger\" onclick=\"delTruck('${t.id}')\">Supprimer</button></td>`; ttb.appendChild(tr); });
+  const ctb=document.querySelector('#client-table tbody'); ctb.innerHTML=''; const cq=(document.getElementById('client-filter')?.value||'').toLowerCase(); db.clients.forEach(c=>{ const hay=[c.name,c.phone||'',c.addr||''].join(' ').toLowerCase(); if(cq && !hay.includes(cq)) return; const inv=db.trips.filter(t=>t.clientId===c.id).reduce((s,t)=>s+t.total+(Number(t.fees)||0),0); const pay=db.payments.filter(p=>p.type==='encaissement' && p.counterpartyId===c.id).reduce((s,p)=>s+p.amount,0); const bal=inv-pay; const credit=Math.max(0, pay-inv); const tr=document.createElement('tr'); tr.innerHTML=`<td>${c.name}</td><td>${c.phone||''}</td><td>${c.addr||''}</td><td class="nowrap ${bal>0?'':'kpi'}">${fmt(bal)}</td><td class="nowrap ${credit>0?'kpi':''}">${fmt(credit)}</td><td class="actions"><button class="btn secondary" onclick="editClient('${c.id}')">Modifier</button> <button class="btn danger" onclick="delClient('${c.id}')">Supprimer</button></td>`; ctb.appendChild(tr); });
+  const stb=document.querySelector('#sup-table tbody'); stb.innerHTML=''; const sq=(document.getElementById('sup-filter')?.value||'').toLowerCase(); db.suppliers.forEach(s=>{ const hay=[s.name,s.phone||'',s.addr||''].join(' ').toLowerCase(); if(sq && !hay.includes(sq)) return; const purchases=db.expenses.filter(e=>e.supplierId===s.id).reduce((sum,e)=>sum+e.amount,0); const pay=db.payments.filter(p=>p.type==='decaissement' && p.counterpartyId===s.id).reduce((sum,p)=>sum+p.amount,0); const bal=purchases-pay; const tr=document.createElement('tr'); tr.innerHTML=`<td>${s.name}</td><td>${s.phone||''}</td><td>${s.addr||''}</td><td class="nowrap ${bal>0?'':'kpi'}">${fmt(bal)}</td><td class="actions"><button class="btn secondary" onclick="editSupplier('${s.id}')">Modifier</button> <button class="btn danger" onclick="delSupplier('${s.id}')">Supprimer</button></td>`; stb.appendChild(tr); });
+  const tripTb=document.querySelector('#trip-table tbody'); tripTb.innerHTML='';
+  const tripQ=(document.getElementById('trip-filter')?.value||'').toLowerCase();
+  db.trips.forEach(t=>{ const truck=db.trucks.find(x=>x.id===t.truckId)?.name||''; const client=db.clients.find(x=>x.id===t.clientId)?.name||''; const hay=[t.date,truck,client,t.item,t.feesNote||'',t.paid].join(' ').toLowerCase(); if(tripQ && !hay.includes(tripQ)) return; const tr=document.createElement('tr'); tr.innerHTML=`<td>${t.date}</td><td>${truck}</td><td>${client}</td><td>${t.item}</td><td class="nowrap">${fmt(t.qty)}</td><td class="nowrap">${fmt(t.price)}</td><td class="nowrap">${fmt(t.total)}</td><td class="nowrap">${fmt(t.fees)}</td><td>${t.feesNote||''}</td><td><span class="pill">${t.paid}</span></td><td class="actions"><button class="btn secondary" onclick="editTrip('${t.id}')">Modifier</button> <button class="btn danger" onclick="delTrip('${t.id}')">Supprimer</button></td>`; tripTb.appendChild(tr); });
+  const expTb=document.querySelector('#exp-table tbody'); expTb.innerHTML=''; const eq=(document.getElementById('exp-filter')?.value||'').toLowerCase(); db.expenses.forEach(e=>{ const sup=e.supplierId?(db.suppliers.find(x=>x.id===e.supplierId)?.name||''):''; const trk=e.truckId?(db.trucks.find(x=>x.id===e.truckId)?.name||''):''; const hay=[e.date,e.cat,sup,trk,e.paid].join(' ').toLowerCase(); if(eq && !hay.includes(eq)) return; const tr=document.createElement('tr'); tr.innerHTML=`<td>${e.date}</td><td>${e.cat}</td><td>${sup}</td><td>${trk}</td><td class="nowrap">${fmt(e.amount)}</td><td><span class="pill">${e.paid}</span></td><td class="actions"><button class="btn secondary" onclick="editExpense('${e.id}')">Modifier</button> <button class="btn danger" onclick="delExpense('${e.id}')">Supprimer</button></td>`; expTb.appendChild(tr); });
+  const payTb=document.querySelector('#pay-table tbody'); payTb.innerHTML=''; const pq=(document.getElementById('pay-filter')?.value||'').toLowerCase(); db.payments.forEach(p=>{ const c=db.clients.find(x=>x.id===p.counterpartyId); const s=db.suppliers.find(x=>x.id===p.counterpartyId); const name=c?('Client: '+c.name):(s?('Fournisseur: '+s.name):''); const hay=[p.date,name,p.note||'',p.type].join(' ').toLowerCase(); if(pq && !hay.includes(pq)) return; const tr=document.createElement('tr'); tr.innerHTML=`<td>${p.date}</td><td>${p.type==='encaissement'?'Encaissement':'Décaissement'}</td><td>${name}</td><td class="nowrap">${fmt(p.amount)}</td><td>${p.note||''}</td><td class="actions"><button class="btn secondary" onclick="editPayment('${p.id}')">Modifier</button> <button class="btn danger" onclick="delPayment('${p.id}')">Supprimer</button></td>`; payTb.appendChild(tr); });
+}
+
+refreshAll(); updateClientCreditInfo && updateClientCreditInfo();
+
+// Show client credit when client changes
+function updateClientCreditInfo(){
+  const cid = document.getElementById('trip-client').value;
+  const el = document.getElementById('client-credit-info');
+  if(!cid || !el){ return; }
+  const inv = db.trips.filter(t=>t.clientId===cid).reduce((s,t)=>s+t.total+(Number(t.fees)||0)-(Number(t.clientPay)||0),0);
+  const pay = db.payments.filter(p=>p.type==='encaissement' && p.counterpartyId===cid).reduce((s,p)=>s+p.amount,0);
+  const credit = Math.max(0, pay - inv);
+  el.textContent = 'Crédit disponible: ' + fmt(credit) + ' CFA';
+}
+document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='trip-client'){ updateClientCreditInfo(); } });
+document.addEventListener('input', (e)=>{ if(e.target && e.target.id==='trip-client'){ updateClientCreditInfo(); } });
+
+updateClientCreditInfo();
+</script>
+
+<style>
+  .quicknav{position:fixed;left:0;right:0;bottom:8px;display:flex;justify-content:center;pointer-events:none;}
+  .quicknav .bar{pointer-events:auto;background:#111;color:#fff;padding:6px 10px;border-radius:12px;display:flex;gap:8px;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+  .quicknav button,.quicknav select{border:none;border-radius:8px;padding:8px 10px}
+  .quicknav button{background:#fff;color:#111}
+  .quicknav select{background:#fff}
+</style>
+<div class="quicknav" id="quicknav">
+  <div class="bar">
+    <button id="qn-prev" title="Section précédente">⟵</button>
+    <select id="qn-select" title="Aller à la section"></select>
+    <button id="qn-next" title="Section suivante">⟶</button>
+  </div>
+</div>
+<script>
+(function(){
+  const map = Array.from(document.querySelectorAll('nav button')).map((b,i)=>({i, label:b.textContent, id:b.onclick?b.onclick.toString().match(/'(.*?)'/)?.[1]:b.textContent}));
+  const sel = document.getElementById('qn-select');
+  map.forEach(m=>{ const o=document.createElement('option'); o.value=m.i; o.textContent=m.label; sel.appendChild(o); });
+  function activeIndex(){ return map.findIndex((m,idx)=>document.querySelectorAll('nav button')[idx].classList.contains('active')); }
+  sel.value = activeIndex();
+  sel.onchange = ()=>{ const i=parseInt(sel.value,10); document.querySelectorAll('nav button')[i].click(); };
+  document.getElementById('qn-prev').onclick = ()=>{ const i=activeIndex(); const ni=(i-1+map.length)%map.length; document.querySelectorAll('nav button')[ni].click(); sel.value=ni; };
+  document.getElementById('qn-next').onclick = ()=>{ const i=activeIndex(); const ni=(i+1)%map.length; document.querySelectorAll('nav button')[ni].click(); sel.value=ni; };
+  // keep in sync if user taps top tabs
+  document.addEventListener('click', (e)=>{
+    if(e.target && e.target.closest('nav button')){
+      setTimeout(()=>{ sel.value = activeIndex(); }, 0);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
